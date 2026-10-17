@@ -141,14 +141,14 @@ class MainActivity : Activity() {
         statusView = label("Offline-first • 12GB RAM profile", 12f)
         root.addView(statusView)
         val tabs = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        for (t in listOf("Music", "Photo", "Video", "Models", "Setup")) {
+        for (t in listOf("Music", "Images", "Models", "Setup")) {
             tabs.addView(TextView(this).apply {
                 text = t
                 textSize = 12f
                 gravity = Gravity.CENTER
                 setTextColor(if (t == tab) teal else faint)
                 setPadding(0, dp(14), 0, dp(14))
-                setOnClickListener { showScreen(t) }
+                setOnClickListener { if (t == "Images") startActivity(Intent(this@MainActivity, ImagesActivity::class.java)) else showScreen(t) }
             }, LinearLayout.LayoutParams(0, -2, 1f))
         }
         root.addView(tabs)
@@ -161,8 +161,6 @@ class MainActivity : Activity() {
         root.addView(scroll, LinearLayout.LayoutParams(-1, 0, 1f))
         when (tab) {
             "Music" -> showMusic()
-            "Photo" -> showPhoto()
-            "Video" -> showVideo()
             "Models" -> modelManager.render(content)
             else -> showSetup()
         }
@@ -172,10 +170,10 @@ class MainActivity : Activity() {
         add(label("No Termux. The engine runs inside this app using the models you downloaded in Models.", 13f))
         add(button("Start built-in YuE2") { nativeYuE.start() })
         add(button("Stop built-in YuE2") { nativeYuE.stop() })
-        val endpoint = input("YuE2 URL", prefs.getString("endpoint", "http://127.0.0.1:8087") ?: "")
+        val base = "http://127.0.0.1:8087" // Native engine lives inside the app
         val style = input("Style / genre", prefs.getString("style", "Industrial techno, glitch hop") ?: "")
         val words = input("Lyrics (leave blank for instrumental)", prefs.getString("lyrics", "") ?: "", 6)
-        add(endpoint); add(style); add(words)
+        add(style); add(words)
         val instrumental = Switch(this).apply {
             text = "Instrumental (no singing)"
             setTextColor(white)
@@ -183,21 +181,19 @@ class MainActivity : Activity() {
         }
         add(instrumental)
         add(button("Check YuE2 connection") {
-            val base = endpoint.text.toString().trimEnd('/')
-            if (!validUrl(base)) { status("Invalid server URL"); return@button }
+            val base = "http://127.0.0.1:8087"
             runJob("Connection") {
                 val (code, data, _) = request(base + "/health")
                 status(if (code == 200) "Server responds: " + data.toString(Charsets.UTF_8).take(110) else "Not ready (HTTP " + code + ")")
             }
         })
         add(button("Generate YuE2 music") {
-            val base = endpoint.text.toString().trimEnd('/')
-            if (!validUrl(base)) { status("Invalid server URL"); return@button }
+            val base = "http://127.0.0.1:8087" // Built-in engine only
             val genre = style.text.toString()
             val lyrics = words.text.toString()
             val noVocal = instrumental.isChecked
             if (genre.isBlank() && lyrics.isBlank()) { status("Add a style or lyrics"); return@button }
-            prefs.edit().putString("endpoint", base).putString("style", genre)
+            prefs.edit().putString("style", genre)
                 .putString("lyrics", lyrics).putBoolean("instrumental", noVocal).apply()
             runJob("YuE2 generation") {
                 if (base == "http://127.0.0.1:8087") nativeYuE.ensureStarted()
@@ -320,27 +316,6 @@ class MainActivity : Activity() {
         })
         add(label("Local text-to-image model integration is planned; no model is bundled yet.", 13f))
     }
-    private fun showVideo() {
-        add(label("Photo-to-video • Offline", 19f))
-        add(label("Create a 5-second H.264 MP4 zooming a photo. NOT neural video generation.", 13f))
-        add(button("Choose starting photo") { choose() })
-        add(label(if (selectedPhoto == null) "No photo selected" else "Photo selected"))
-        add(button("Create 5-second MP4") {
-            val uri = selectedPhoto
-            if (uri == null) { status("Choose a photo first"); return@button }
-            runJob("Encode MP4") {
-                val bitmap = decode(uri)
-                val mp4 = File(cacheDir, "s26_" + System.currentTimeMillis() + ".mp4")
-                try {
-                    makeVideo(bitmap, mp4)
-                    val result = save(mp4.readBytes(), "video/mp4", "Movies", mp4.name)
-                    status("MP4 saved to Movies")
-                    open(result, "video/mp4")
-                } finally { bitmap.recycle(); mp4.delete() }
-            }
-        })
-        add(label("Neodragon/Wan generative video backends are not integrated yet.", 13f))
-    }
     private fun showSetup() {
         add(label("S26 Ultra • Device status", 19f))
         add(label("Detected: " + android.os.Build.MANUFACTURER + " " + android.os.Build.MODEL))
@@ -425,76 +400,6 @@ class MainActivity : Activity() {
             })
         } catch (_: Exception) {
             Toast.makeText(this, "Saved to Android " + mime.substringBefore('/'), Toast.LENGTH_LONG).show()
-        }
-    }
-    private fun makeVideo(image: Bitmap, file: File) {
-        val w = 640
-        val h = 360
-        val fps = 15
-        val codec = MediaCodec.createEncoderByType(MediaFormat.MIMETYPE_VIDEO_AVC)
-        val config = MediaFormat.createVideoFormat(MediaFormat.MIMETYPE_VIDEO_AVC, w, h).apply {
-            setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface)
-            setInteger(MediaFormat.KEY_BIT_RATE, 1300000)
-            setInteger(MediaFormat.KEY_FRAME_RATE, fps)
-            setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 1)
-        }
-        codec.configure(config, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
-        val surface = codec.createInputSurface()
-        val muxer = MediaMuxer(file.absolutePath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
-        val info = MediaCodec.BufferInfo()
-        var started = false
-        var track = -1
-        try {
-            codec.start()
-            fun drain(last: Boolean) {
-                var empty = 0
-                while (empty < (if (last) 150 else 2)) {
-                    val index = codec.dequeueOutputBuffer(info, 10000L)
-                    if (index == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED) {
-                        track = muxer.addTrack(codec.outputFormat)
-                        muxer.start()
-                        started = true
-                    } else if (index >= 0) {
-                        if (info.size > 0 && started) {
-                            val buffer = codec.getOutputBuffer(index) ?: error("Encoder buffer missing")
-                            buffer.position(info.offset)
-                            buffer.limit(info.offset + info.size)
-                            muxer.writeSampleData(track, buffer, info)
-                        }
-                        codec.releaseOutputBuffer(index, false)
-                        if ((info.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) return
-                        empty = 0
-                    } else empty++
-                }
-            }
-            val paint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
-            val begin = System.nanoTime()
-            for (i in 0 until 5 * fps) {
-                val canvas = surface.lockHardwareCanvas()
-                try {
-                    canvas.drawColor(Color.BLACK)
-                    val zoom = 1.03f + .08f * (i.toFloat() / (5 * fps).toFloat())
-                    val scale = maxOf(w.toFloat() / image.width, h.toFloat() / image.height) * zoom
-                    val drawW = image.width * scale
-                    val drawH = image.height * scale
-                    canvas.drawBitmap(image, null, RectF(
-                        (w - drawW) / 2, (h - drawH) / 2,
-                        (w + drawW) / 2, (h + drawH) / 2
-                    ), paint)
-                } finally { surface.unlockCanvasAndPost(canvas) }
-                drain(false)
-                val delay = (begin + (i + 1L) * 1000000000L / fps - System.nanoTime()) / 1000000L
-                if (delay > 0) Thread.sleep(delay)
-            }
-            codec.signalEndOfInputStream()
-            drain(true)
-            if (!started) error("No H.264 data produced")
-        } finally {
-            try { codec.stop() } catch (_: Exception) {}
-            codec.release()
-            surface.release()
-            try { if (started) muxer.stop() } catch (_: Exception) {}
-            muxer.release()
         }
     }
     override fun onDestroy() {

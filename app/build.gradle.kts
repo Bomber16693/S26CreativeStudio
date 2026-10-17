@@ -10,8 +10,8 @@ android {
     applicationId = "com.bomber16693.s26creativestudio"
     minSdk = 29
     targetSdk = 36
-    versionCode = 4
-    versionName = "0.3.1"
+    versionCode = 5
+    versionName = "0.4.0"
     ndk { abiFilters += listOf("arm64-v8a") }
     externalNativeBuild {
       cmake {
