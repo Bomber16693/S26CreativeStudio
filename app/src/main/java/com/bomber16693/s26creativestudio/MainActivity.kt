@@ -188,8 +188,7 @@ class MainActivity : Activity() {
             }
         })
         add(button("Generate YuE2 music") {
-            val base = endpoint.text.toString().trimEnd('/')
-            if (!validUrl(base)) { status("Invalid server URL"); return@button }
+            val base = "http://127.0.0.1:8087" // Built-in engine only
             val genre = style.text.toString()
             val lyrics = words.text.toString()
             val noVocal = instrumental.isChecked
