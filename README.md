@@ -4,7 +4,7 @@ Samsung Galaxy S26 Ultra (12GB RAM), Android 16.
 
 ## Images — fully offline after model download
 
-**Recommended model:** Stable Diffusion 1.5, official `v1-5-pruned-emaonly.safetensors` single-file checkpoint (4,265,146,304 bytes, CreativeML Open RAIL-M). Available in **Models → Stable Diffusion 1.5**. This is a conservative memory-first recommendation for this phone; it is **not** necessarily the highest-quality model the hardware could run, but its 512×512 architecture, image-to-image and LoRA compatibility make it a good first supported option.
+**Recommended model:** Stable Diffusion 1.5 **FP16**, `v1-5-pruned-emaonly-fp16.safetensors`, approximately 2.13GB from the Comfy-Org archive (CreativeML Open RAIL-M). A 4.27GB full-precision checkpoint is also available as an alternative. Available in **Models → Stable Diffusion 1.5**. This is a conservative memory-first recommendation for this phone; it is **not** necessarily the highest-quality model the hardware could run, but its 512×512 architecture, image-to-image and LoRA compatibility make it a good first supported option.
 
 - Open Images after downloading checkpoint.
 - Text prompt and optional negative prompt → generate 512×512 image locally (no photos/prompts sent to cloud).
@@ -15,7 +15,7 @@ Samsung Galaxy S26 Ultra (12GB RAM), Android 16.
 - Inference backend: pinned [stable-diffusion.cpp](https://github.com/leejet/stable-diffusion.cpp), compiled for Android ARM64 CPU. No GPU/NPU acceleration in this version. Jobs may be slow; test on the physical S26 before expecting dependable performance.
 
 ### Resources
-- 4.27GB checkpoint download, allow additional storage overhead.
+- Recommended 2.13GB FP16 checkpoint download; leave additional storage for output files and imports.
 - Only one image task at a time; close other heavy apps and do not run YuE2 at the same time.
 - Stable Diffusion 1.5 is not a modern instruction-following image edit model. It performs denoising/inpainting, not exact semantic object edits.
 - Importing an unrelated SDXL or FLUX model in Models does **not** make it compatible with the SD1.5-specific UI and LoRA presets.
