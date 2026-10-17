@@ -281,7 +281,7 @@ private class PaintMaskView(activity:Activity):View(activity) {
         canvas.drawColor(Color.rgb(32,43,61))
         photograph?.let { canvas.drawBitmap(it,null,Rect(0,0,width,height),Paint(Paint.FILTER_BITMAP_FLAG)) }
         val px=IntArray(512*512);image.getPixels(px,0,512,0,0,512,512)
-        for(i in px.indices)px[i]=if(px[i] and 0xff>127)Color.argb(150,255,255,255) else 0
+        for(i in px.indices)px[i]=if((px[i] and 0xff)>127)Color.argb(150,255,255,255) else 0
         val overlay=Bitmap.createBitmap(px,512,512,Bitmap.Config.ARGB_8888)
         canvas.drawBitmap(overlay,null,Rect(0,0,width,height),Paint(Paint.FILTER_BITMAP_FLAG))
         overlay.recycle()
