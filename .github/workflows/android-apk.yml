@@ -10,7 +10,7 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -36,11 +36,32 @@ jobs:
           git submodule update --init --recursive --depth 1
       - name: Configure embedded engine
         run: python3 scripts/prepare_native.py
+      - name: Fetch pinned local image engine
+        run: |
+          mkdir -p app/src/main/cpp/sdcpp
+          cd app/src/main/cpp/sdcpp
+          git init -q
+          git remote add origin https://github.com/leejet/stable-diffusion.cpp.git
+          git fetch --depth 1 origin f0aac524d3f29140e60ba78f3cfb16d6acea87db
+          git checkout -q FETCH_HEAD
+          git submodule update --init --depth 1 ggml
+      - name: Build Stable Diffusion ARM64 CPU engine
+        run: |
+          python3 scripts/prepare_sd.py
+          cmake -S app/src/main/cpp/sdcpp -B /tmp/sdbuild -G Ninja \
+            -DCMAKE_TOOLCHAIN_FILE="$ANDROID_HOME/ndk/27.2.12479018/build/cmake/android.toolchain.cmake" \
+            -DANDROID_ABI=arm64-v8a -DANDROID_PLATFORM=29 -DANDROID_STL=c++_static \
+            -DCMAKE_BUILD_TYPE=MinSizeRel -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
+            -DSD_BUILD_EXAMPLES=OFF -DSD_WEBP=OFF -DSD_WEBM=OFF \
+            -DSD_VULKAN=OFF -DSD_OPENCL=OFF -DGGML_NATIVE=OFF -DGGML_OPENMP=OFF
+          cmake --build /tmp/sdbuild --target s26sd -j 2
+          mkdir -p app/src/main/jniLibs/arm64-v8a
+          cp /tmp/sdbuild/bin/libs26sd.so app/src/main/jniLibs/arm64-v8a/
       - name: Build Android ARM64 APK
         run: gradle --no-daemon :app:assembleDebug
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: S26Studio-embedded-YuE2-APK
+          name: S26Studio-local-image-music-APK
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error

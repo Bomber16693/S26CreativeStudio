@@ -36,6 +36,12 @@ class ModelManager(private val activity: Activity, private val progress: (String
     private val directory = File(activity.getExternalFilesDir(null) ?: activity.filesDir, "models").apply { mkdirs() }
     private var exportModel: String? = null
     private val models = listOf(
+        Spec("SD1.5 FP16 (RECOMMENDED • 12GB)", "v1-5-pruned-emaonly-fp16.safetensors", 2_130_000_000L,
+            "Local images: 512x512 • photo restyle • inpainting • SD1.5 LoRA. CreativeML Open RAIL-M.",
+            "https://huggingface.co/Comfy-Org/stable-diffusion-v1-5-archive/resolve/main/v1-5-pruned-emaonly-fp16.safetensors"),
+        Spec("Stable Diffusion 1.5 • full precision alternative", "v1-5-pruned-emaonly.safetensors", 4_265_146_304L,
+            "LOCAL image generation • 512x512 • img2img / mask editing / SD1.5 LoRAs. CreativeML Open RAIL-M. Runs CPU, may be slow.",
+            "https://huggingface.co/stable-diffusion-v1-5/stable-diffusion-v1-5/resolve/main/v1-5-pruned-emaonly.safetensors"),
         Spec("YuE2 • Q5 backbone", "YuE2-3B-Q5_K_M.gguf", 2_620_000_000L,
             "Music • smaller 3.6B backbone • requires VAE + separate yue2.cpp engine",
             "https://huggingface.co/Serveurperso/YuE2-GGUF/resolve/main/YuE2-3B-Q5_K_M.gguf"),
@@ -67,7 +73,7 @@ class ModelManager(private val activity: Activity, private val progress: (String
     private fun human(bytes: Long) = String.format(java.util.Locale.US, "%.2f GB", bytes.toDouble() / 1_000_000_000.0)
     fun render(column: LinearLayout) {
         add(column, text("Download model files", 20f))
-        add(column, text("Files download to app storage. They DO NOT generate images, music or video until a compatible model engine is installed.", 13f))
+        add(column, text("Models download to private phone storage. YuE2 runs with the built-in music engine; SD1.5 powers the local image editor. LoRAs must match SD1.5.", 13f))
         add(column, text("Free phone storage: " + human(StatFs(directory.absolutePath).availableBytes), 13f))
         for (m in models) {
             val existing = File(directory, m.file)
@@ -92,21 +98,21 @@ class ModelManager(private val activity: Activity, private val progress: (String
             }
         }
         add(column, text("Already downloaded a model? Import it from Downloads or Documents. Useful after reinstalling the app.", 13f))
-        add(column, button("Import GGUF model from phone") {
+        add(column, button("Import downloaded .GGUF / .safetensors from phone") {
             activity.startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
                 type = "*/*"
                 addCategory(Intent.CATEGORY_OPENABLE)
             }, IMPORT_MODEL_CODE)
         })
         add(column, button("Pause / stop downloading") { abort.set(true); progress("Pausing download; partial file kept") })
-        add(column, text("Photo and video AI models", 18f))
-        add(column, text("Those backends are not installed yet. You can browse compatible NPU model projects, but importing a model alone won't make it runnable here.", 13f))
-        add(column, button("View NPU photo / video model project") {
+        add(column, text("Local image models", 18f))
+        add(column, text("Recommended for S26 Ultra 12GB: the smaller SD1.5 FP16 checkpoint above. Models larger than SD1.5 are not validated. SD1.5 LoRAs are imported in Image Studio.", 13f))
+        add(column, button("About SD1.5 image runtime") {
             activity.startActivity(Intent(Intent.ACTION_VIEW,
-                Uri.parse("https://github.com/AbrahamPaulJ/nightmare-mobile")))
+                Uri.parse("https://github.com/leejet/stable-diffusion.cpp")))
         })
         add(column, text("Custom model download (advanced)", 18f))
-        add(column, text("Direct HTTPS model files only. Custom files are download-only until a compatible inference backend exists.", 13f))
+        add(column, text("Direct HTTPS model files only. Custom files require a compatible format; only SD1.5 single-file checkpoints are supported for local images.", 13f))
         val custom = EditText(activity).apply {
             hint = "https://huggingface.co/.../resolve/main/model.gguf"
             setSingleLine(false)
@@ -225,8 +231,8 @@ class ModelManager(private val activity: Activity, private val progress: (String
             }
         }
         val filename = name ?: "unknown"
-        if (!filename.matches(Regex("[A-Za-z0-9_.-]{3,140}")) || !filename.endsWith(".gguf", true)) {
-            progress("Choose a .gguf model with its original filename")
+        if (!filename.matches(Regex("[A-Za-z0-9_.-]{3,140}")) || !(filename.endsWith(".gguf", true) || filename.endsWith(".safetensors", true))) {
+            progress("Choose a YuE2 .gguf or an SD1.5 .safetensors checkpoint")
             return
         }
         if (!busy.compareAndSet(false, true)) { progress("Another model operation is running"); return }
@@ -260,10 +266,10 @@ class ModelManager(private val activity: Activity, private val progress: (String
                 } ?: error("Cannot open selected model file")
                 if (declaredSize > 0 && copied != declaredSize)
                     error("Incomplete copy: " + human(copied))
-                if (copied < 1024L || !hasGgufMagic(part))
+                if (copied < 1024L || (filename.endsWith(".gguf",true) && !hasGgufMagic(part)))
                     error("Selected file is not a valid GGUF model")
                 if (!part.renameTo(dest)) error("Could not finish import")
-                progress("Imported " + filename + ". Return to Music to start built-in YuE2.")
+                progress("Imported " + filename + ". Return to Music or Images to use it.")
             } catch (e: Exception) {
                 part.delete()
                 progress("Import failed: " + (e.message ?: "unknown error"))
