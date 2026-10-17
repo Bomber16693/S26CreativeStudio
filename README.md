@@ -1,25 +1,33 @@
-# S26 Creative Studio 0.4 — Image & Music MVP
+# S26 Creative Studio — Local Images + YuE2 Music (v0.5 experimental)
 
-**Samsung Galaxy S26 Ultra (12 GB RAM).**
+Samsung Galaxy S26 Ultra (12GB RAM), Android 16.
 
-## Music (on-device, experimental)
-- The app packages an ARM64 yue2.cpp native library (from pinned upstream Git commit).
-- Download/import YuE2 Q5 backbone + 530MB VAE via **Models**. Press **Start built-in YuE2** under Music; you don't need Termux.
-- Music requests run through the local loopback service hosted **inside the app process**. CPU only; successful music generation on S26 Ultra is **not verified** and could be slow or fail due to memory.
-- Old YuE2 backend supports both instrumental/lyrics and MP3 exports. Builds are verified by CI only, not on physical device.
+## Images — fully offline after model download
 
-## Images
-- **Offline**: select a photo; adjust brightness and saturation, then export PNG.
-- **Optional free online AI image generation**: text-to-image, image-to-image and masked inpainting through [AI Horde](https://aihorde.net/). This is **NOT** an offline diffusion engine.
-- **Cloud LoRA**: supply a compatible CivitAI LoRA name/version in the image studio, along with model name and LoRA weight. The remote worker must support and be able to fetch it.
-- Anonymous API key: ten zeros. Free shared volunteer workers may have long queues; give a registered key for priority.
-- **Photo privacy**: photos used for AI edits are transmitted to volunteers only after selecting the explicit source photo consent switch. Anonymous requests may be shared by AI Horde regardless of the app's sharing preference.
-- The app has no installed Stable Diffusion NPU/Vulkan runtime yet, so local generative image models and local LoRA inference are **not supported**. Existing model downloads are file management only.
+**Recommended model:** Stable Diffusion 1.5, official `v1-5-pruned-emaonly.safetensors` single-file checkpoint (4,265,146,304 bytes, CreativeML Open RAIL-M). Available in **Models → Stable Diffusion 1.5**. This is a conservative memory-first recommendation for this phone; it is **not** necessarily the highest-quality model the hardware could run, but its 512×512 architecture, image-to-image and LoRA compatibility make it a good first supported option.
 
-## Install
-GitHub Actions downloads the pinned upstream YuE2/GGML source, cross-compiles an arm64 shared library with the NDK, then builds `app-debug.apk`.
-Open the newest successful **Build Android APK** run in GitHub Actions and download its artifact ZIP. No PC required.
+- Open Images after downloading checkpoint.
+- Text prompt and optional negative prompt → generate 512×512 image locally (no photos/prompts sent to cloud).
+- Choose photo and use edit strength → img2img restyle.
+- Paint white over photo in mask panel → selective inpainting (results depend on the base checkpoint; dedicated inpainting checkpoints can improve quality).
+- Import **SD1.5-compatible** LoRA `.safetensors` on Images screen; choose from installed list, set strength.
+- Save result to Pictures/S26CreativeStudio.
+- Inference backend: pinned [stable-diffusion.cpp](https://github.com/leejet/stable-diffusion.cpp), compiled for Android ARM64 CPU. No GPU/NPU acceleration in this version. Jobs may be slow; test on the physical S26 before expecting dependable performance.
 
-### IMPORTANT: signed APK updates
-GitHub Actions debug signing keys can differ between builds. Before uninstalling any older version, **export your downloaded GGUF model files** from the Models tab to Documents/Downloads. Uninstalling an app deletes its private model data. After installing, re-import the files. 
-This is a testing APK, not a signed release-track installer.
+### Resources
+- 4.27GB checkpoint download, allow additional storage overhead.
+- Only one image task at a time; close other heavy apps and do not run YuE2 at the same time.
+- Stable Diffusion 1.5 is not a modern instruction-following image edit model. It performs denoising/inpainting, not exact semantic object edits.
+- Importing an unrelated SDXL or FLUX model in Models does **not** make it compatible with the SD1.5-specific UI and LoRA presets.
+
+## Music — experimental in-app YuE2
+Existing [yue2.cpp](https://github.com/ServeurpersoCom/yue2.cpp) native ARM64 CPU integration is preserved. Download Q5 GGUF and VAE through Models; use **Start built-in YuE2** on Music. No Termux application required. Running entire songs on 12GB RAM has not been tested on the physical device and may be slow or unstable.
+
+## APK builds from GitHub
+GitHub Actions builds both native backends and the Android app, then attaches an APK ZIP artifact. This is a debug build; the signing key can change between runs. **Export models before uninstalling an older app**, because Android deletes private app model files when uninstalled. Update installs may fail if signatures differ.
+
+## Security and privacy
+Image neural inference is local. The app needs Internet only for downloading model weights and any optional YuE2 API connections. No cloud AI image generation is launched from the Images tab. Models may have license restrictions; the official SD1.5 checkpoint uses CreativeML Open RAIL-M. YuE2 weights typically have non-commercial restrictions.
+
+## Development status
+Compilation of native libraries in CI does not establish successful on-phone inference. Verify small generations first and report errors with model filename and memory/thermal status.
