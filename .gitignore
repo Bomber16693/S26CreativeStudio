@@ -1,0 +1,7 @@
+.gradle/
+.idea/
+local.properties
+build/
+**/build/
+*.iml
+/app/src/main/cpp/yue2/
