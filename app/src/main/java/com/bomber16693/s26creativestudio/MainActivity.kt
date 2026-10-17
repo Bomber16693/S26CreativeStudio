@@ -60,6 +60,8 @@ class MainActivity : Activity() {
     private val pickerCode = 871
     private val modelManagerDelegate = lazy { ModelManager(this) { status(it) } }
     private val modelManager by modelManagerDelegate
+    private val nativeYuEDelegate = lazy { NativeYuE(this) { status(it) } }
+    private val nativeYuE by nativeYuEDelegate
     private fun modelManagerDelegateInitialized() = modelManagerDelegate.isInitialized()
 
     override fun onCreate(state: Bundle?) {
@@ -166,8 +168,10 @@ class MainActivity : Activity() {
         }
     }
     private fun showMusic() {
-        add(label("YuE2 • Experimental local server", 19f))
-        add(label("Requires yue2.cpp already installed and running, for example in Termux. No model weights are bundled.", 13f))
+        add(label("YuE2 • Built-in engine (experimental)", 19f))
+        add(label("No Termux. The engine runs inside this app using the models you downloaded in Models.", 13f))
+        add(button("Start built-in YuE2") { nativeYuE.start() })
+        add(button("Stop built-in YuE2") { nativeYuE.stop() })
         val endpoint = input("YuE2 URL", prefs.getString("endpoint", "http://127.0.0.1:8087") ?: "")
         val style = input("Style / genre", prefs.getString("style", "Industrial techno, glitch hop") ?: "")
         val words = input("Lyrics (leave blank for instrumental)", prefs.getString("lyrics", "") ?: "", 6)
@@ -196,6 +200,7 @@ class MainActivity : Activity() {
             prefs.edit().putString("endpoint", base).putString("style", genre)
                 .putString("lyrics", lyrics).putBoolean("instrumental", noVocal).apply()
             runJob("YuE2 generation") {
+                if (base == "http://127.0.0.1:8087") nativeYuE.ensureStarted()
                 val body = JSONObject().put("style", genre).put("lyrics", if (noVocal) "" else lyrics)
                     .put("duration", 30.0).put("cot", "full").put("steps", 16)
                     .put("lm_batch_size", 1).put("synth_batch_size", 1)
@@ -215,9 +220,9 @@ class MainActivity : Activity() {
                     if (state == "done" || state == "completed") {
                         val (downloadCode, bytes, mime) = request(base + "/job" + query + "&result=1")
                         if (downloadCode !in 200..299) error("Result HTTP " + downloadCode)
-                        if (mime.contains("multipart/")) error("Multipart output requires the separate codec adapter")
-                        if (bytes.size < 100 || bytes.size > 48 * 1024 * 1024) error("Unexpected audio size")
-                        val uri = save(bytes, "audio/mpeg", "Music", "yue2_" + System.currentTimeMillis() + ".mp3")
+                        val audio = if (mime.contains("multipart/")) extractMp3(bytes, mime) else bytes
+                        if (audio.size < 100 || audio.size > 48 * 1024 * 1024) error("Unexpected audio size")
+                        val uri = save(audio, "audio/mpeg", "Music", "yue2_" + System.currentTimeMillis() + ".mp3")
                         status("YuE2 song saved in Music")
                         open(uri, "audio/mpeg")
                         return@runJob
@@ -261,6 +266,31 @@ class MainActivity : Activity() {
             }
             return Triple(code, data.toByteArray(), c.contentType ?: "")
         } finally { c.disconnect() }
+    }
+    private fun extractMp3(data: ByteArray, mime: String): ByteArray {
+        val boundary=mime.substringAfter("boundary=","").trim().trim('"')
+        if(boundary.isBlank())error("No multipart boundary in music response")
+        fun index(bytes:ByteArray,from:Int):Int {
+            if(bytes.isEmpty())return -1
+            for(i in from..(data.size-bytes.size)){
+                var found=true
+                for(k in bytes.indices)if(data[i+k]!=bytes[k]){found=false;break}
+                if(found)return i
+            }
+            return -1
+        }
+        val delimiter="\r\n\r\n".toByteArray(Charsets.US_ASCII)
+        val next=("\r\n--"+boundary).toByteArray(Charsets.US_ASCII)
+        var from=0
+        while(from<data.size){
+            val head=index(delimiter,from);if(head<0)break
+            val meta=data.copyOfRange(from,head).toString(Charsets.ISO_8859_1)
+            val begin=head+delimiter.size
+            val end=index(next,begin);if(end<0)break
+            if(meta.contains("Content-Type: audio/",true))return data.copyOfRange(begin,end)
+            from=end+next.size
+        }
+        error("No MP3 audio part found in YuE2 response")
     }
     private fun showPhoto() {
         add(label("Photo enhancement • Offline", 19f))
@@ -468,5 +498,6 @@ class MainActivity : Activity() {
         cancelled.set(true)
         workers.shutdown()
         if (modelManagerDelegateInitialized()) modelManager.stop()
+        if (nativeYuEDelegate.isInitialized()) nativeYuE.stop()
     }
 }
