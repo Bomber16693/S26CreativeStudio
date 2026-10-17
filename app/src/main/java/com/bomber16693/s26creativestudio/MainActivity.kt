@@ -148,7 +148,7 @@ class MainActivity : Activity() {
                 gravity = Gravity.CENTER
                 setTextColor(if (t == tab) teal else faint)
                 setPadding(0, dp(14), 0, dp(14))
-                setOnClickListener { if (t == "Images") startActivity(Intent(this@MainActivity, ImagesActivity::class.java)) else showScreen(t) }
+                setOnClickListener { if (t == "Images") startActivity(Intent(this@MainActivity, LocalImagesActivity::class.java)) else showScreen(t) }
             }, LinearLayout.LayoutParams(0, -2, 1f))
         }
         root.addView(tabs)
