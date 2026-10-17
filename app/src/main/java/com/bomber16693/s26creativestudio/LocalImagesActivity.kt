@@ -74,7 +74,7 @@ class LocalImagesActivity : Activity() {
     override fun onCreate(state: Bundle?) {
         super.onCreate(state)
         window.statusBarColor=background; window.navigationBarColor=background
-        val scroll=ScrollView(this).apply { setBackgroundColor(background); isFillViewport=true }
+        val scroll=ScrollView(this).apply { setBackgroundColor(this@LocalImagesActivity.background); isFillViewport=true }
         body=LinearLayout(this).apply { orientation=LinearLayout.VERTICAL; setPadding(dp(16),dp(12),dp(16),dp(30)) }
         if (android.os.Build.VERSION.SDK_INT>=30) body.setOnApplyWindowInsetsListener { view,insets->
             val bars=insets.getInsets(WindowInsets.Type.systemBars())
