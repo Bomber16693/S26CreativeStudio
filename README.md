@@ -2,6 +2,12 @@
 
 Runs upstream yue2.cpp as a native ARM64 shared library inside Android. No separate Termux process.
 
+## Keep previously downloaded models before updating
+
+1. In v0.2, export EACH downloaded GGUF from **Models → Export to selected folder**, preferably to **Documents**. Confirm both files are visible there.
+2. If Android refuses to update because this build uses a different debug signing key, uninstall v0.2. Android will erase its app-specific model folder.
+3. Install this native preview. In **Models → Import GGUF model from phone**, choose the previously exported backbone and VAE. Import copies them into the app-specific storage so the internal engine can read them.
+
 ## Usage
 Download YuE2 Q5 backbone and VAE in Models, open Music and press **Start built-in YuE2**. The engine loads model weights locally and handles jobs using its own internal loopback 127.0.0.1:8087 server. Then choose style and lyrics and tap Generate.
 

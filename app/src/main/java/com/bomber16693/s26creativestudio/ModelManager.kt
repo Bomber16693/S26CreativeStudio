@@ -8,6 +8,7 @@ import android.net.Uri
 import android.os.Environment
 import android.os.StatFs
 import android.provider.DocumentsContract
+import android.provider.OpenableColumns
 import android.view.View
 import android.view.Gravity
 import android.widget.Button
@@ -25,7 +26,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 /** On-device downloader: can store model files, but does not run neural inference. */
 class ModelManager(private val activity: Activity, private val progress: (String) -> Unit) {
-    companion object { const val EXPORT_FOLDER_CODE = 982 }
+    companion object { const val EXPORT_FOLDER_CODE = 982; const val IMPORT_MODEL_CODE = 983 }
     private val teal = Color.rgb(105, 229, 222)
     private val white = Color.rgb(235, 241, 247)
     private val subdued = Color.rgb(178, 195, 207)
@@ -90,6 +91,13 @@ class ModelManager(private val activity: Activity, private val progress: (String
                 })
             }
         }
+        add(column, text("Already downloaded a model? Import it from Downloads or Documents. Useful after reinstalling the app.", 13f))
+        add(column, button("Import GGUF model from phone") {
+            activity.startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+                type = "*/*"
+                addCategory(Intent.CATEGORY_OPENABLE)
+            }, IMPORT_MODEL_CODE)
+        })
         add(column, button("Pause / stop downloading") { abort.set(true); progress("Pausing download; partial file kept") })
         add(column, text("Photo and video AI models", 18f))
         add(column, text("Those backends are not installed yet. You can browse compatible NPU model projects, but importing a model alone won't make it runnable here.", 13f))
@@ -204,6 +212,65 @@ class ModelManager(private val activity: Activity, private val progress: (String
                 ". This does not validate all weights or run the model." else "Invalid GGUF header")
         } else progress("Saved " + file.name + " • " + human(file.length()) + " (not inference-tested)")
     }
+    fun importModel(uri: Uri?) {
+        if (uri == null) { progress("Import cancelled"); return }
+        val cursor = activity.contentResolver.query(uri,
+            arrayOf(OpenableColumns.DISPLAY_NAME, OpenableColumns.SIZE), null, null, null)
+        var name: String? = null
+        var declaredSize: Long = -1L
+        cursor?.use { c ->
+            if (c.moveToFirst()) {
+                name = c.getString(0)
+                if (!c.isNull(1)) declaredSize = c.getLong(1)
+            }
+        }
+        val filename = name ?: "unknown"
+        if (!filename.matches(Regex("[A-Za-z0-9_.-]{3,140}")) || !filename.endsWith(".gguf", true)) {
+            progress("Choose a .gguf model with its original filename")
+            return
+        }
+        if (!busy.compareAndSet(false, true)) { progress("Another model operation is running"); return }
+        abort.set(false)
+        executor.execute {
+            val dest = File(directory, filename)
+            val part = File(directory, filename + ".importing")
+            try {
+                if (dest.exists()) error("Model already exists. Delete it first if replacing.")
+                val available = StatFs(directory.absolutePath).availableBytes
+                if (declaredSize > 0 && available < declaredSize + 200_000_000L)
+                    error("Not enough free storage to import " + human(declaredSize))
+                var copied = 0L
+                var tick = 0L
+                activity.contentResolver.openInputStream(uri)?.use { source ->
+                    FileOutputStream(part).use { target ->
+                        val buffer = ByteArray(128 * 1024)
+                        while (true) {
+                            if (abort.get()) error("Import interrupted")
+                            val n = source.read(buffer)
+                            if (n < 0) break
+                            target.write(buffer, 0, n)
+                            copied += n
+                            val now = System.currentTimeMillis()
+                            if (now - tick > 1500) {
+                                progress("Importing " + filename + ": " + human(copied))
+                                tick = now
+                            }
+                        }
+                    }
+                } ?: error("Cannot open selected model file")
+                if (declaredSize > 0 && copied != declaredSize)
+                    error("Incomplete copy: " + human(copied))
+                if (copied < 1024L || !hasGgufMagic(part))
+                    error("Selected file is not a valid GGUF model")
+                if (!part.renameTo(dest)) error("Could not finish import")
+                progress("Imported " + filename + ". Return to Music to start built-in YuE2.")
+            } catch (e: Exception) {
+                part.delete()
+                progress("Import failed: " + (e.message ?: "unknown error"))
+            } finally { busy.set(false) }
+        }
+    }
+
     fun onExportFolder(tree: Uri?) {
         val selected = exportModel
         exportModel = null

@@ -362,6 +362,10 @@ class MainActivity : Activity() {
     @Deprecated("Legacy activity result support for this prototype")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == ModelManager.IMPORT_MODEL_CODE && resultCode == RESULT_OK) {
+            modelManager.importModel(data?.data)
+            return
+        }
         if (requestCode == ModelManager.EXPORT_FOLDER_CODE && resultCode == RESULT_OK) {
             modelManager.onExportFolder(data?.data)
             return
