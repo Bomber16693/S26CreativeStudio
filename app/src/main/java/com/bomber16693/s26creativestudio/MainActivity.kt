@@ -24,6 +24,8 @@ import android.os.PowerManager
 import android.provider.MediaStore
 import android.view.Gravity
 import android.view.View
+import android.view.WindowInsets
+import android.os.Build
 import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
@@ -56,6 +58,9 @@ class MainActivity : Activity() {
     private var mode = "Music"
     private var running = false
     private val pickerCode = 871
+    private val modelManagerDelegate = lazy { ModelManager(this) { status(it) } }
+    private val modelManager by modelManagerDelegate
+    private fun modelManagerDelegateInitialized() = modelManagerDelegate.isInitialized()
 
     override fun onCreate(state: Bundle?) {
         super.onCreate(state)
@@ -123,14 +128,21 @@ class MainActivity : Activity() {
             setBackgroundColor(navy)
         }
         setContentView(root)
+        if (Build.VERSION.SDK_INT >= 30) {
+            root.setOnApplyWindowInsetsListener { v, insets ->
+                val bars = insets.getInsets(WindowInsets.Type.systemBars())
+                v.setPadding(dp(16) + bars.left, dp(14) + bars.top, dp(16) + bars.right, dp(14) + bars.bottom)
+                insets
+            }
+        }
         root.addView(label("S26 / CREATIVE STUDIO", 22f).apply { setTextColor(teal) })
         statusView = label("Offline-first • 12GB RAM profile", 12f)
         root.addView(statusView)
         val tabs = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        for (t in listOf("Music", "Photo", "Video", "Setup")) {
+        for (t in listOf("Music", "Photo", "Video", "Models", "Setup")) {
             tabs.addView(TextView(this).apply {
                 text = t
-                textSize = 14f
+                textSize = 12f
                 gravity = Gravity.CENTER
                 setTextColor(if (t == tab) teal else faint)
                 setPadding(0, dp(14), 0, dp(14))
@@ -149,6 +161,7 @@ class MainActivity : Activity() {
             "Music" -> showMusic()
             "Photo" -> showPhoto()
             "Video" -> showVideo()
+            "Models" -> modelManager.render(content)
             else -> showSetup()
         }
     }
@@ -319,6 +332,10 @@ class MainActivity : Activity() {
     @Deprecated("Legacy activity result support for this prototype")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == ModelManager.EXPORT_FOLDER_CODE && resultCode == RESULT_OK) {
+            modelManager.onExportFolder(data?.data)
+            return
+        }
         if (requestCode == pickerCode && resultCode == RESULT_OK) {
             selectedPhoto = data?.data
             selectedPhoto?.let {
@@ -450,5 +467,6 @@ class MainActivity : Activity() {
         super.onDestroy()
         cancelled.set(true)
         workers.shutdown()
+        if (modelManagerDelegateInitialized()) modelManager.stop()
     }
 }
