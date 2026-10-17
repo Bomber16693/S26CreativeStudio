@@ -1,23 +1,25 @@
-# S26 Creative Studio v0.3.0: embedded YuE2 preview
+# S26 Creative Studio 0.4 — Image & Music MVP
 
-Runs upstream yue2.cpp as a native ARM64 shared library inside Android. No separate Termux process.
+**Samsung Galaxy S26 Ultra (12 GB RAM).**
 
-## Keep previously downloaded models before updating
+## Music (on-device, experimental)
+- The app packages an ARM64 yue2.cpp native library (from pinned upstream Git commit).
+- Download/import YuE2 Q5 backbone + 530MB VAE via **Models**. Press **Start built-in YuE2** under Music; you don't need Termux.
+- Music requests run through the local loopback service hosted **inside the app process**. CPU only; successful music generation on S26 Ultra is **not verified** and could be slow or fail due to memory.
+- Old YuE2 backend supports both instrumental/lyrics and MP3 exports. Builds are verified by CI only, not on physical device.
 
-1. In v0.2, export EACH downloaded GGUF from **Models → Export to selected folder**, preferably to **Documents**. Confirm both files are visible there.
-2. If Android refuses to update because this build uses a different debug signing key, uninstall v0.2. Android will erase its app-specific model folder.
-3. Install this native preview. In **Models → Import GGUF model from phone**, choose the previously exported backbone and VAE. Import copies them into the app-specific storage so the internal engine can read them.
+## Images
+- **Offline**: select a photo; adjust brightness and saturation, then export PNG.
+- **Optional free online AI image generation**: text-to-image, image-to-image and masked inpainting through [AI Horde](https://aihorde.net/). This is **NOT** an offline diffusion engine.
+- **Cloud LoRA**: supply a compatible CivitAI LoRA name/version in the image studio, along with model name and LoRA weight. The remote worker must support and be able to fetch it.
+- Anonymous API key: ten zeros. Free shared volunteer workers may have long queues; give a registered key for priority.
+- **Photo privacy**: photos used for AI edits are transmitted to volunteers only after selecting the explicit source photo consent switch. Anonymous requests may be shared by AI Horde regardless of the app's sharing preference.
+- The app has no installed Stable Diffusion NPU/Vulkan runtime yet, so local generative image models and local LoRA inference are **not supported**. Existing model downloads are file management only.
 
-## Usage
-Download YuE2 Q5 backbone and VAE in Models, open Music and press **Start built-in YuE2**. The engine loads model weights locally and handles jobs using its own internal loopback 127.0.0.1:8087 server. Then choose style and lyrics and tap Generate.
+## Install
+GitHub Actions downloads the pinned upstream YuE2/GGML source, cross-compiles an arm64 shared library with the NDK, then builds `app-debug.apk`.
+Open the newest successful **Build Android APK** run in GitHub Actions and download its artifact ZIP. No PC required.
 
-## Status & limitations
-- **Native engine integration is experimental**. A successful cloud build does not prove that 12GB Android RAM can complete YuE2 song generation.
-- CPU only, no Snapdragon NPU backend. Expect slow processing, memory/thermal limitations, and possible model load failures.
-- YuE2 Q5 and VAE require ~3.2GB storage, plus memory for weights/KV cache.
-- YuE2 .gguf weights aren't bundled; download via Models. Open-source yue2.cpp pinned to 8af01740686824ffd4a1839a457954f42e2a8ce7.
-- APK debug keys might differ across cloud runs, requiring uninstall before installing a different build; uninstalling may delete app-specific model downloads.
-- Generative photo/video backends and image LoRA support still remain unimplemented.
-
-## Build
-GitHub Actions fetches the pinned yue2.cpp + GGML submodule, patches its CMake with scripts/prepare_native.py, builds arm64-v8a libyue2mobile.so with NDK27.2. Licence for yue2.cpp is MIT; model weights have CC BY-NC restrictions.
+### IMPORTANT: signed APK updates
+GitHub Actions debug signing keys can differ between builds. Before uninstalling any older version, **export your downloaded GGUF model files** from the Models tab to Documents/Downloads. Uninstalling an app deletes its private model data. After installing, re-import the files. 
+This is a testing APK, not a signed release-track installer.
