@@ -36,7 +36,10 @@ class ModelManager(private val activity: Activity, private val progress: (String
     private val directory = File(activity.getExternalFilesDir(null) ?: activity.filesDir, "models").apply { mkdirs() }
     private var exportModel: String? = null
     private val models = listOf(
-        Spec("Stable Diffusion 1.5 • Local images", "v1-5-pruned-emaonly.safetensors", 4_265_146_304L,
+        Spec("SD1.5 FP16 (RECOMMENDED • 12GB)", "v1-5-pruned-emaonly-fp16.safetensors", 2_130_000_000L,
+            "Local images: 512x512 • photo restyle • inpainting • SD1.5 LoRA. CreativeML Open RAIL-M.",
+            "https://huggingface.co/Comfy-Org/stable-diffusion-v1-5-archive/resolve/main/v1-5-pruned-emaonly-fp16.safetensors"),
+        Spec("Stable Diffusion 1.5 • full precision alternative", "v1-5-pruned-emaonly.safetensors", 4_265_146_304L,
             "LOCAL image generation • 512x512 • img2img / mask editing / SD1.5 LoRAs. CreativeML Open RAIL-M. Runs CPU, may be slow.",
             "https://huggingface.co/stable-diffusion-v1-5/stable-diffusion-v1-5/resolve/main/v1-5-pruned-emaonly.safetensors"),
         Spec("YuE2 • Q5 backbone", "YuE2-3B-Q5_K_M.gguf", 2_620_000_000L,
@@ -103,7 +106,7 @@ class ModelManager(private val activity: Activity, private val progress: (String
         })
         add(column, button("Pause / stop downloading") { abort.set(true); progress("Pausing download; partial file kept") })
         add(column, text("Local image models", 18f))
-        add(column, text("Recommended for S26 Ultra 12GB: SD1.5 checkpoint above. Models larger than SD1.5 are not validated. SD1.5 LoRAs are imported in Image Studio.", 13f))
+        add(column, text("Recommended for S26 Ultra 12GB: the smaller SD1.5 FP16 checkpoint above. Models larger than SD1.5 are not validated. SD1.5 LoRAs are imported in Image Studio.", 13f))
         add(column, button("About SD1.5 image runtime") {
             activity.startActivity(Intent(Intent.ACTION_VIEW,
                 Uri.parse("https://github.com/leejet/stable-diffusion.cpp")))
